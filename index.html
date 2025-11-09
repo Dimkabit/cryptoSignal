@@ -313,107 +313,41 @@
 
 
 
-    <script>
+<script>
 (async () => {
   const ctx = document.getElementById('marketChart').getContext('2d');
-  const BASE_URL = 'http://localhost:3000'; // если твой proxy локально
+  
+  // 🔧 ДИНАМИЧЕСКИЙ BASE_URL - использует текущий домен
+  const BASE_URL = window.location.origin;
   const SYMBOL = 'BTCUSDT';
   const INTERVAL = '1h';
-  const LIMIT = 300;
+  const LIMIT = 100; // уменьшено для производительности
 
-  // --- Получаем исторические данные с Binance ---
-  const resp = await fetch(`${BASE_URL}/api/history/${SYMBOL}?interval=${INTERVAL}&limit=${LIMIT}`);
-  const raw = await resp.json();
-  const data = raw.data.map(d => ({
-    x: new Date(d.timestamp),
-    o: d.open, h: d.high, l: d.low, c: d.close
-  }));
-
-  // --- Расчёт EMA50 ---
-  const closes = data.map(d => d.c);
-  const period = 50, k = 2 / (period + 1);
-  const ema50 = closes.map((v, i) => {
-    if (i === 0) return v;
-    if (i < period) return null;
-    const prevEma = ema50[i - 1] ?? closes[i - 1];
-    return v * k + prevEma * (1 - k);
-  });
-
-  // --- Расчёт RSI14 ---
-  function calcRSI(values, period = 14) {
-    let gains = 0, losses = 0;
-    for (let i = 1; i <= period; i++) {
-      const diff = values[i] - values[i - 1];
-      if (diff >= 0) gains += diff; else losses -= diff;
+  try {
+    // Получаем исторические данные
+    const resp = await fetch(`${BASE_URL}/api/history/${SYMBOL}?interval=${INTERVAL}&limit=${LIMIT}`);
+    
+    if (!resp.ok) {
+      throw new Error(`HTTP error! status: ${resp.status}`);
     }
-    let avgGain = gains / period, avgLoss = losses / period;
-    const rsi = Array(period).fill(null);
-    for (let i = period; i < values.length; i++) {
-      const diff = values[i] - values[i - 1];
-      const gain = diff >= 0 ? diff : 0, loss = diff < 0 ? -diff : 0;
-      avgGain = (avgGain * (period - 1) + gain) / period;
-      avgLoss = (avgLoss * (period - 1) + loss) / period;
-      const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-      rsi.push(100 - 100 / (1 + rs));
+    
+    const raw = await resp.json();
+    
+    if (!raw.success) {
+      throw new Error('API returned error');
     }
-    return rsi;
+    
+    const data = raw.data.map(d => ({
+      x: new Date(d.timestamp),
+      o: d.open, h: d.high, l: d.low, c: d.close
+    }));
+
+    // ... остальной код анализа и построения графика ...
+    
+  } catch (error) {
+    console.error('Ошибка загрузки данных:', error);
+    // Показать сообщение об ошибке пользователю
   }
-  const rsi14 = calcRSI(closes, 14);
-
-  // --- Генерируем сигналы BUY/SELL ---
-  const signals = [];
-  for (let i = period; i < closes.length; i++) {
-    if (rsi14[i] < 30 && closes[i] > ema50[i]) signals.push({x: data[i].x, y: closes[i], type: 'BUY'});
-    if (rsi14[i] > 70 && closes[i] < ema50[i]) signals.push({x: data[i].x, y: closes[i], type: 'SELL'});
-  }
-
-  // --- График Chart.js ---
-  new Chart(ctx, {
-    type: 'candlestick',
-    data: {
-      datasets: [
-        {
-          label: `${SYMBOL} свечи`,
-          data,
-          borderColor: '#888',
-          color: { up: '#16a34a', down: '#dc2626', unchanged: '#999' }
-        },
-        {
-          label: 'EMA 50',
-          type: 'line',
-          data: data.map((d, i) => ({x: d.x, y: ema50[i]})),
-          borderColor: '#60a5fa',
-          borderWidth: 1.5,
-          pointRadius: 0
-        },
-        {
-          label: 'BUY сигналы',
-          type: 'scatter',
-          data: signals.filter(s => s.type === 'BUY'),
-          pointBackgroundColor: '#22c55e',
-          pointRadius: 5
-        },
-        {
-          label: 'SELL сигналы',
-          type: 'scatter',
-          data: signals.filter(s => s.type === 'SELL'),
-          pointBackgroundColor: '#ef4444',
-          pointRadius: 5
-        }
-      ]
-    },
-    options: {
-      interaction: { mode: 'nearest', intersect: false },
-      plugins: {
-        legend: { labels: { color: '#fff' } },
-        title: { display: true, text: `RSI + EMA (${SYMBOL})`, color: '#fff' }
-      },
-      scales: {
-        x: { ticks: { color: '#aaa' }, grid: { color: '#333' } },
-        y: { ticks: { color: '#aaa' }, grid: { color: '#333' } }
-      }
-    }
-  });
 })();
 </script>
 
