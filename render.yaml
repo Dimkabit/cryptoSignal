@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: cryptosignal
+    name: crypto-signal-pro
     env: node
     plan: free
     buildCommand: npm install
@@ -8,3 +8,5 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: JWT_SECRET
+        generateValue: true

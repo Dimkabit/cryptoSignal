@@ -1196,7 +1196,7 @@
 // });
 
 
-// PortfolioManager - Управление портфелем криптовалют
+// app.js
 class PortfolioManager {
     constructor(api) {
         this.api = api;
