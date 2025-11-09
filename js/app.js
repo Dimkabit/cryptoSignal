@@ -1734,59 +1734,80 @@ class CryptoSignal {
         }
     }
 
-    async updateMarketData() {
+async updateMarketData() {
+    try {
+        console.log('🔄 Обновление рыночных данных...');
+        
+        // 🔧 ИСПОЛЬЗУЕМ НОВЫЙ MULTI-TICKER ЭНДПОИНТ
+        const symbols = this.cryptoPairs.map(pair => pair.symbol).join(',');
+        const response = await fetch(`/api/multi-ticker?symbols=${symbols}`);
+        
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success && Array.isArray(result.data)) {
+                result.data.forEach(data => {
+                    this.marketData.set(data.symbol, data);
+                });
+                console.log('✅ Рыночные данные обновлены (multi-ticker)');
+            } else {
+                throw new Error('Invalid response format');
+            }
+        } else {
+            throw new Error(`HTTP error: ${response.status}`);
+        }
+        
+        this.updateChart();
+        
+    } catch (error) {
+        console.error('❌ Ошибка обновления данных:', error);
+        
+        // 🔧 РЕЗЕРВНЫЙ ВАРИАНТ - индивидуальные запросы
         try {
-            console.log('🔄 Обновление рыночных данных...');
-            
             for (const pair of this.cryptoPairs) {
-                try {
-                    const data = await this.fetchCryptoData(pair.symbol);
-                    if (data) {
-                        this.marketData.set(pair.symbol, data);
-                        if (data.isDemo) {
-                            console.log(`📊 Используются демо-данные для ${pair.symbol}`);
-                        }
-                    }
-                } catch (error) {
-                    console.error(`❌ Ошибка для ${pair.symbol}:`, error.message);
+                const data = await this.fetchCryptoData(pair.symbol);
+                if (data) {
+                    this.marketData.set(pair.symbol, data);
                 }
             }
-            
-            this.updateChart();
-            console.log('✅ Рыночные данные обновлены');
-            
-        } catch (error) {
-            console.error('❌ Критическая ошибка обновления данных:', error);
+            console.log('✅ Рыночные данные обновлены (fallback)');
+        } catch (fallbackError) {
+            console.error('❌ Критическая ошибка обновления данных:', fallbackError);
             this.showNotification('Используются демо-данные', 'warning');
         }
     }
+}
 
-    async fetchCryptoData(symbol) {
-        try {
-            const baseUrl = window.location.origin;
-            const response = await fetch(`${baseUrl}/api/ticker/${symbol}`, { timeout: 5000 });
-            
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            
-            const result = await response.json();
-            if (!result.success) throw new Error('API returned error');
-            
-            const data = result.data;
-            return {
-                symbol: symbol,
-                price: parseFloat(data.lastPrice),
-                change24h: parseFloat(data.priceChangePercent),
-                volume: parseFloat(data.volume),
-                high: parseFloat(data.highPrice),
-                low: parseFloat(data.lowPrice),
-                timestamp: Date.now()
-            };
-            
-        } catch (err) {
-            console.warn(`⚠️ Ошибка получения данных для ${symbol}:`, err.message);
-            return this.generateDemoData(symbol);
-        }
+async fetchCryptoData(symbol) {
+    try {
+        const baseUrl = window.location.origin;
+        
+        // 🔧 ИСПРАВЛЕННЫЙ ЭНДПОИНТ
+        const response = await fetch(`${baseUrl}/api/realtime/${symbol}`, { 
+            timeout: 5000 
+        });
+        
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const result = await response.json();
+        if (!result.success) throw new Error('API returned error');
+        
+        const data = result.data;
+        return {
+            symbol: symbol,
+            price: parseFloat(data.price),
+            change24h: parseFloat(data.change24h),
+            volume: parseFloat(data.volume),
+            high: parseFloat(data.high),
+            low: parseFloat(data.low),
+            timestamp: Date.now(),
+            isDemo: data.isDemo || false
+        };
+        
+    } catch (err) {
+        console.warn(`⚠️ Ошибка получения данных для ${symbol}:`, err.message);
+        return this.generateDemoData(symbol);
     }
+}
 
     generateDemoData(symbol) {
         const basePrices = {
@@ -2050,48 +2071,70 @@ createSignalCard(signal) {
         }
     }
 
-    async saveSignalToHistory(signal) {
-        try {
-            const signalData = {
-                id: signal.id.toString(),
-                user_id: signal.user_id,
-                symbol: signal.pair || signal.symbol,
-                name: signal.name,
-                action: signal.action,
-                entry_price: signal.price,
-                target_price: signal.targetPrice || signal.target_price,
-                stop_loss: signal.stopLoss || signal.stop_loss,
-                confidence: signal.confidence,
-                result: 'pending',
-                actual_profit: 0,
-                timestamp: signal.executedAt || Date.now(),
-                status: signal.status,
-                reason: signal.reason || 'Рыночный сигнал',
-                urgency: signal.urgency || 'medium'
-            };
+async saveSignalToHistory(signal) {
+    try {
+        const signalData = {
+            symbol: signal.pair || signal.symbol,
+            name: signal.name,
+            action: signal.action,
+            entry_price: signal.price,
+            target_price: signal.targetPrice || signal.target_price,
+            stop_loss: signal.stopLoss || signal.stop_loss,
+            confidence: signal.confidence,
+            result: 'pending',
+            actual_profit: 0,
+            reason: signal.reason || 'Рыночный сигнал'
+        };
 
-            const response = await fetch('tables/signals_history', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(signalData)
-            });
+        // 🔧 ИСПРАВЛЕННЫЙ ЭНДПОИНТ
+        const response = await fetch('/api/signals/history', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.getAuthToken()}`
+            },
+            body: JSON.stringify(signalData)
+        });
 
-            if (response.ok) console.log('Сигнал сохранен в историю:', signalData);
-        } catch (error) {
-            console.error('Ошибка при сохранении сигнала в историю:', error);
+        if (response.ok) {
+            console.log('Сигнал сохранен в историю:', signalData);
+        } else {
+            console.warn('Не удалось сохранить сигнал в историю');
         }
+    } catch (error) {
+        console.error('Ошибка при сохранении сигнала в историю:', error);
     }
+}
 
-    async loadSignalsHistory() {
-        try {
-            const userId = this.portfolioManager ? this.portfolioManager.userId : 'anonymous';
-            const response = await fetch(`tables/signals_history?user_id=${userId}&limit=10&sort=timestamp&order=desc`);
-            const data = await response.json();
-            this.renderSignalsHistory(data.data || []);
-        } catch (error) {
-            console.error('Ошибка при загрузке истории сигналов:', error);
+// 🔧 ДОБАВЬТЕ ЭТОТ МЕТОД ДЛЯ ПОЛУЧЕНИЯ ТОКЕНА
+getAuthToken() {
+    // Если у вас есть система аутентификации, верните токен
+    // Или верните null для демо-режима
+    return localStorage.getItem('authToken') || null;
+}
+
+async loadSignalsHistory() {
+    try {
+        // 🔧 ИСПРАВЛЕННЫЙ ЭНДПОИНТ
+        const response = await fetch('/api/signals/history?limit=10');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            this.renderSignalsHistory(result.data || []);
+        } else {
+            console.warn('API returned error for signals history');
+            this.renderSignalsHistory([]);
+        }
+    } catch (error) {
+        console.error('Ошибка при загрузке истории сигналов:', error);
+        this.renderSignalsHistory([]);
     }
+}
 
     renderSignalsHistory(signals) {
         const container = document.getElementById('signalsHistory');
