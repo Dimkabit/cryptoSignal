@@ -2,7 +2,7 @@
 const axios = require('axios');
 
 // === Настройки ===
-const BASE_URL = 'http://localhost:3000'; // твой прокси-сервер Binance
+const BASE_URL = process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
 const SYMBOL = 'BTCUSDT';
 const INTERVAL = '1h';
 const LIMIT = 500; // количество свечей для анализа
@@ -43,53 +43,68 @@ function calculateRSI(prices, period = 14) {
 // === Основная функция ===
 async function runBacktest() {
     console.log(`\n📊 Тестируем стратегию RSI + EMA для ${SYMBOL} (${INTERVAL})`);
-    const resp = await axios.get(`${BASE_URL}/api/history/${SYMBOL}?interval=${INTERVAL}&limit=${LIMIT}`);
-    const data = resp.data.data;
 
-    const closes = data.map(d => d.close);
-    const ema50 = calculateEMA(closes, 50);
-    const rsi14 = calculateRSI(closes, 14);
-
-    let balance = START_BALANCE;
-    let position = 0;
-    let entryPrice = 0;
-    let trades = [];
-
-    for (let i = 50; i < closes.length; i++) {
-        const price = closes[i];
-        const ema = ema50[i];
-        const rsi = rsi14[i];
-
-        // buy
-        if (rsi < 30 && price > ema && position === 0) {
-            position = balance / price;
-            entryPrice = price;
-            balance = 0;
-            trades.push({ type: 'BUY', price, index: i });
+    try {
+        const resp = await axios.get(`${BASE_URL}/api/history/${SYMBOL}?interval=${INTERVAL}&limit=${LIMIT}`);
+        const data = resp.data.data;
+        if (!Array.isArray(data) || data.length === 0) {
+            throw new Error('Нет данных для анализа.');
         }
 
-        // sell
-        if (rsi > 70 && price < ema && position > 0) {
-            balance = position * price;
-            trades.push({ type: 'SELL', price, index: i, profit: (price - entryPrice) / entryPrice * 100 });
-            position = 0;
+        const closes = data.map(d => d.close);
+        const ema50 = calculateEMA(closes, 50);
+        const rsi14 = calculateRSI(closes, 14);
+
+        let balance = START_BALANCE;
+        let position = 0;
+        let entryPrice = 0;
+        let trades = [];
+
+        for (let i = 50; i < closes.length; i++) {
+            const price = closes[i];
+            const ema = ema50[i];
+            const rsi = rsi14[i];
+
+            // buy
+            if (rsi < 30 && price > ema && position === 0) {
+                position = balance / price;
+                entryPrice = price;
+                balance = 0;
+                trades.push({ type: 'BUY', price, index: i });
+            }
+
+            // sell
+            if (rsi > 70 && price < ema && position > 0) {
+                balance = position * price;
+                trades.push({
+                    type: 'SELL',
+                    price,
+                    index: i,
+                    profit: (price - entryPrice) / entryPrice * 100
+                });
+                position = 0;
+            }
         }
+
+        if (position > 0) {
+            balance = position * closes[closes.length - 1];
+        }
+
+        const totalReturn = ((balance - START_BALANCE) / START_BALANCE * 100).toFixed(2);
+
+        console.log(`\n💰 Результат: ${totalReturn}%`);
+        console.log(`📈 Итоговый баланс: $${balance.toFixed(2)}`);
+        console.log(`🔁 Совершено сделок: ${trades.length}`);
+        console.log(`\n📋 Сигналы:`);
+
+        trades.forEach(t => {
+            console.log(`${t.type} @ ${t.price.toFixed(2)} ${t.profit ? `(прибыль ${t.profit.toFixed(2)}%)` : ''}`);
+        });
+
+    } catch (error) {
+        console.error(`❌ Ошибка при выполнении бэктеста: ${error.message}`);
     }
-
-    if (position > 0) {
-        balance = position * closes[closes.length - 1];
-    }
-
-    const totalReturn = ((balance - START_BALANCE) / START_BALANCE * 100).toFixed(2);
-
-    console.log(`\n💰 Результат: ${totalReturn}%`);
-    console.log(`📈 Итоговый баланс: $${balance.toFixed(2)}`);
-    console.log(`🔁 Совершено сделок: ${trades.length}`);
-    console.log(`\n📋 Сигналы:`);
-
-    trades.forEach(t => {
-        console.log(`${t.type} @ ${t.price.toFixed(2)} ${t.profit ? `(прибыль ${t.profit.toFixed(2)}%)` : ''}`);
-    });
 }
+
 
 runBacktest().catch(console.error);
