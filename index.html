@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoSignal - Торговые сигналы криптовалют</title>
+    <meta name="description" content="Минимальные ставки, максимальная прибыль. Торговые сигналы для криптовалют с риском всего 1-2$.">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.9.0"></script>
+
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .glass { backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.1); }
+        .signal-card { transition: all 0.3s ease; }
+        .signal-card:hover { transform: translateY(-5px); }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-chart-line text-3xl text-yellow-400"></i>
+                    <h1 class="text-2xl font-bold">CryptoSignal</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="glass rounded-lg px-4 py-2">
+                        <span class="text-sm">Минимальный риск: <span class="text-green-400 font-semibold">$1-2</span></span>
+                    </div>
+                    <button id="notificationBtn" class="relative p-2 rounded-lg glass hover:bg-white/20 transition-colors">
+                        <i class="fas fa-bell text-xl"></i>
+                        <span id="notificationBadge" class="absolute -top-1 -right-1 bg-red-500 text-xs rounded-full w-5 h-5 flex items-center justify-center hidden">0</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="glass rounded-xl p-6 text-center">
+                <i class="fas fa-bullseye text-3xl text-green-400 mb-3"></i>
+                <h3 class="text-lg font-semibold mb-1">Точность сигналов</h3>
+                <p id="accuracyRate" class="text-3xl font-bold text-green-400">78%</p>
+            </div>
+            <div class="glass rounded-xl p-6 text-center">
+                <i class="fas fa-dollar-sign text-3xl text-yellow-400 mb-3"></i>
+                <h3 class="text-lg font-semibold mb-1">Средний профит</h3>
+                <p id="avgProfit" class="text-3xl font-bold text-yellow-400">+12%</p>
+            </div>
+            <div class="glass rounded-xl p-6 text-center">
+                <i class="fas fa-shield-alt text-3xl text-blue-400 mb-3"></i>
+                <h3 class="text-lg font-semibold mb-1">Макс. потери</h3>
+                <p class="text-3xl font-bold text-blue-400">$2</p>
+            </div>
+            <div class="glass rounded-xl p-6 text-center">
+                <i class="fas fa-fire text-3xl text-red-400 mb-3"></i>
+                <h3 class="text-lg font-semibold mb-1">Активные сигналы</h3>
+                <p id="activeSignals" class="text-3xl font-bold text-red-400">0</p>
+            </div>
+        </div>
+
+        <!-- Portfolio Section -->
+        <section class="mb-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold flex items-center">
+                    <i class="fas fa-wallet mr-3 text-green-400"></i>
+                    Мой портфель
+                </h2>
+                <button id="addAssetBtn" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors">
+                    <i class="fas fa-plus mr-2"></i>Добавить актив
+                </button>
+            </div>
+
+            <!-- Portfolio Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="glass rounded-xl p-6 text-center">
+                    <i class="fas fa-coins text-3xl text-yellow-400 mb-3"></i>
+                    <h3 class="text-lg font-semibold mb-1">Общая стоимость</h3>
+                    <p id="portfolioValue" class="text-3xl font-bold text-yellow-400">$0</p>
+                </div>
+                <div class="glass rounded-xl p-6 text-center">
+                    <i class="fas fa-chart-line text-3xl text-green-400 mb-3"></i>
+                    <h3 class="text-lg font-semibold mb-1">Прибыль/убыток</h3>
+                    <p id="portfolioProfit" class="text-3xl font-bold text-green-400">$0</p>
+                </div>
+                <div class="glass rounded-xl p-6 text-center">
+                    <i class="fas fa-percentage text-3xl text-blue-400 mb-3"></i>
+                    <h3 class="text-lg font-semibold mb-1">ROI</h3>
+                    <p id="portfolioROI" class="text-3xl font-bold text-blue-400">0%</p>
+                </div>
+            </div>
+
+            <!-- Portfolio Assets -->
+            <div id="portfolioContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Активы портфеля будут добавлены динамически -->
+            </div>
+
+            <!-- Signals History -->
+            <div class="mt-8">
+                <h3 class="text-xl font-bold mb-4 flex items-center">
+                    <i class="fas fa-history mr-3 text-purple-400"></i>
+                    История сигналов
+                </h3>
+                <div id="signalsHistory" class="glass rounded-xl p-6">
+                    <div class="text-center text-gray-400">
+                        <i class="fas fa-history text-4xl mb-4"></i>
+                        <p>История сигналов будет отображаться здесь</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empty Portfolio Message -->
+            <div id="emptyPortfolio" class="text-center py-12">
+                <i class="fas fa-wallet text-6xl text-gray-500 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-400 mb-2">Портфель пуст</h3>
+                <p class="text-gray-500">Добавьте свои криптовалюты для отслеживания</p>
+            </div>
+        </section>
+
+        <!-- Trading Signals Section -->
+        <section class="mb-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold flex items-center">
+                    <i class="fas fa-satellite-dish mr-3 text-purple-400"></i>
+                    Торговые сигналы
+                </h2>
+                <div class="flex space-x-3">
+                    <button id="autoMode" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors">
+                        <i class="fas fa-robot mr-2"></i>Авто режим
+                    </button>
+                    <button id="refreshBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                        <i class="fas fa-sync-alt mr-2"></i>Обновить
+                    </button>
+                </div>
+            </div>
+
+            <!-- Signals Container -->
+            <div id="signalsContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Сигналы будут добавлены динамически -->
+            </div>
+
+            <!-- No Signals Message -->
+            <div id="noSignals" class="text-center py-12">
+                <i class="fas fa-search text-6xl text-gray-500 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-400 mb-2">Сигналы не найдены</h3>
+                <p class="text-gray-500">Нажмите "Обновить" для поиска новых торговых возможностей</p>
+            </div>
+        </section>
+
+        <!-- Chart Section -->
+        <section class="mb-8">
+            <div class="glass rounded-xl p-6">
+                <h3 class="text-xl font-bold mb-4 flex items-center">
+                    <i class="fas fa-chart-candlestick mr-3 text-indigo-400"></i>
+                    Анализ рынка
+                </h3>
+                <div class="h-96">
+                    <canvas id="marketChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings -->
+        <section class="mb-8">
+            <div class="glass rounded-xl p-6">
+                <h3 class="text-xl font-bold mb-4 flex items-center">
+                    <i class="fas fa-cog mr-3 text-gray-400"></i>
+                    Настройки риска
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Максимальный риск ($)</label>
+                        <select id="maxRisk" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="1">$1</option>
+                            <option value="2" selected>$2</option>
+                            <option value="5">$5</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Минимальный профит (%)</label>
+                        <select id="minProfit" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="3">3%</option>
+                            <option value="5" selected>5%</option>
+                            <option value="10">10%</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Тип криптовалют</label>
+                        <select id="cryptoType" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="all" selected>Все</option>
+                            <option value="stable">Стабильные</option>
+                            <option value="volatile">Волатильные</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 py-8 mt-16">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-gray-400">⚠️ Внимание: Торговля криптовалютами связана с риском. Не инвестируйте больше, чем готовы потерять.</p>
+            <p class="text-gray-500 text-sm mt-2">CryptoSignal © 2025 - Минимальные ставки, максимальная безопасность</p>
+        </div>
+    </footer>
+
+    <!-- Notification Permission Modal -->
+    <div id="notificationModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="glass rounded-xl p-6 max-w-md mx-4">
+            <h3 class="text-xl font-bold mb-4">Разрешить уведомления?</h3>
+            <p class="text-gray-300 mb-6">Получайте мгновенные уведомления о новых торговых сигналах прямо на ваше устройство.</p>
+            <div class="flex space-x-3">
+                <button id="allowNotifications" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors">
+                    Разрешить
+                </button>
+                <button id="denyNotifications" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors">
+                    Отказаться
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Asset Modal -->
+    <div id="addAssetModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="glass rounded-xl p-6 max-w-md mx-4 w-full">
+            <h3 class="text-xl font-bold mb-4 flex items-center">
+                <i class="fas fa-plus-circle mr-3 text-green-400"></i>
+                Добавить актив в портфель
+            </h3>
+            
+            <form id="addAssetForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Криптовалюта</label>
+                    <select id="assetSymbol" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500">
+                        <option value="">Выберите криптовалюту</option>
+                        <option value="BTCUSDT">Bitcoin (BTC)</option>
+                        <option value="ETHUSDT">Ethereum (ETH)</option>
+                        <option value="ADAUSDT">Cardano (ADA)</option>
+                        <option value="DOTUSDT">Polkadot (DOT)</option>
+                        <option value="MATICUSDT">Polygon (MATIC)</option>
+                        <option value="SOLUSDT">Solana (SOL)</option>
+                        <option value="AVAXUSDT">Avalanche (AVAX)</option>
+                        <option value="ATOMUSDT">Cosmos (ATOM)</option>
+                    </select>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Количество</label>
+                        <input type="number" id="assetAmount" step="0.0001" min="0.0001" placeholder="0.00" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Цена покупки (USDT)</label>
+                        <input type="number" id="assetBuyPrice" step="0.0001" min="0.0001" placeholder="0.00" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Цель продажи (USDT)</label>
+                        <input type="number" id="assetTargetPrice" step="0.0001" min="0.0001" placeholder="0.00" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Стоп-лосс (USDT)</label>
+                        <input type="number" id="assetStopLoss" step="0.0001" min="0.0001" placeholder="0.00" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Дата покупки</label>
+                    <input type="date" id="assetBuyDate" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Заметки (необязательно)</label>
+                    <textarea id="assetNotes" rows="2" placeholder="Причина покупки, ожидания..." class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
+                </div>
+            </form>
+            
+            <div class="flex space-x-3 mt-6">
+                <button id="saveAsset" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors">
+                    <i class="fas fa-save mr-2"></i>Сохранить
+                </button>
+                <button id="cancelAddAsset" class="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors">
+                    <i class="fas fa-times mr-2"></i>Отмена
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+
+
+
+    <script>
+(async () => {
+  const ctx = document.getElementById('marketChart').getContext('2d');
+  const BASE_URL = 'http://localhost:3000'; // если твой proxy локально
+  const SYMBOL = 'BTCUSDT';
+  const INTERVAL = '1h';
+  const LIMIT = 300;
+
+  // --- Получаем исторические данные с Binance ---
+  const resp = await fetch(`${BASE_URL}/api/history/${SYMBOL}?interval=${INTERVAL}&limit=${LIMIT}`);
+  const raw = await resp.json();
+  const data = raw.data.map(d => ({
+    x: new Date(d.timestamp),
+    o: d.open, h: d.high, l: d.low, c: d.close
+  }));
+
+  // --- Расчёт EMA50 ---
+  const closes = data.map(d => d.c);
+  const period = 50, k = 2 / (period + 1);
+  const ema50 = closes.map((v, i) => {
+    if (i === 0) return v;
+    if (i < period) return null;
+    const prevEma = ema50[i - 1] ?? closes[i - 1];
+    return v * k + prevEma * (1 - k);
+  });
+
+  // --- Расчёт RSI14 ---
+  function calcRSI(values, period = 14) {
+    let gains = 0, losses = 0;
+    for (let i = 1; i <= period; i++) {
+      const diff = values[i] - values[i - 1];
+      if (diff >= 0) gains += diff; else losses -= diff;
+    }
+    let avgGain = gains / period, avgLoss = losses / period;
+    const rsi = Array(period).fill(null);
+    for (let i = period; i < values.length; i++) {
+      const diff = values[i] - values[i - 1];
+      const gain = diff >= 0 ? diff : 0, loss = diff < 0 ? -diff : 0;
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+      const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+      rsi.push(100 - 100 / (1 + rs));
+    }
+    return rsi;
+  }
+  const rsi14 = calcRSI(closes, 14);
+
+  // --- Генерируем сигналы BUY/SELL ---
+  const signals = [];
+  for (let i = period; i < closes.length; i++) {
+    if (rsi14[i] < 30 && closes[i] > ema50[i]) signals.push({x: data[i].x, y: closes[i], type: 'BUY'});
+    if (rsi14[i] > 70 && closes[i] < ema50[i]) signals.push({x: data[i].x, y: closes[i], type: 'SELL'});
+  }
+
+  // --- График Chart.js ---
+  new Chart(ctx, {
+    type: 'candlestick',
+    data: {
+      datasets: [
+        {
+          label: `${SYMBOL} свечи`,
+          data,
+          borderColor: '#888',
+          color: { up: '#16a34a', down: '#dc2626', unchanged: '#999' }
+        },
+        {
+          label: 'EMA 50',
+          type: 'line',
+          data: data.map((d, i) => ({x: d.x, y: ema50[i]})),
+          borderColor: '#60a5fa',
+          borderWidth: 1.5,
+          pointRadius: 0
+        },
+        {
+          label: 'BUY сигналы',
+          type: 'scatter',
+          data: signals.filter(s => s.type === 'BUY'),
+          pointBackgroundColor: '#22c55e',
+          pointRadius: 5
+        },
+        {
+          label: 'SELL сигналы',
+          type: 'scatter',
+          data: signals.filter(s => s.type === 'SELL'),
+          pointBackgroundColor: '#ef4444',
+          pointRadius: 5
+        }
+      ]
+    },
+    options: {
+      interaction: { mode: 'nearest', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#fff' } },
+        title: { display: true, text: `RSI + EMA (${SYMBOL})`, color: '#fff' }
+      },
+      scales: {
+        x: { ticks: { color: '#aaa' }, grid: { color: '#333' } },
+        y: { ticks: { color: '#aaa' }, grid: { color: '#333' } }
+      }
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
