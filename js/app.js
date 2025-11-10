@@ -1,6 +1,98 @@
 
 // app.js
 
+// === БАЗОВЫЕ СТРАТЕГИИ ===
+class ScalpingStrategy {
+    constructor() {
+        this.name = "Скальпинг";
+    }
+    
+    analyze(symbol, historicalData) {
+        if (!historicalData || historicalData.length < 10) return null;
+        
+        const recentPrices = historicalData.slice(-5).map(d => d.close);
+        const avgPrice = recentPrices.reduce((a, b) => a + b) / recentPrices.length;
+        const currentPrice = recentPrices[recentPrices.length - 1];
+        const volatility = Math.max(...recentPrices) / Math.min(...recentPrices) - 1;
+        
+        if (volatility > 0.02 && currentPrice < avgPrice * 0.995) {
+            return {
+                action: 'BUY',
+                price: currentPrice,
+                targetPrice: currentPrice * 1.015,
+                stopLoss: currentPrice * 0.99,
+                confidence: 65,
+                reason: 'Скальпинг: отскок от поддержки'
+            };
+        }
+        
+        return null;
+    }
+}
+
+class TrendFollowingStrategy {
+    constructor() {
+        this.name = "Следование тренду";
+    }
+    
+    analyze(symbol, historicalData) {
+        if (!historicalData || historicalData.length < 20) return null;
+        
+        const prices = historicalData.map(d => d.close);
+        const shortMA = this.calculateMA(prices, 5);
+        const longMA = this.calculateMA(prices, 15);
+        
+        if (shortMA > longMA * 1.01) {
+            return {
+                action: 'BUY',
+                price: prices[prices.length - 1],
+                targetPrice: prices[prices.length - 1] * 1.05,
+                stopLoss: prices[prices.length - 1] * 0.97,
+                confidence: 70,
+                reason: 'Тренд вверх: короткая MA выше длинной'
+            };
+        }
+        
+        return null;
+    }
+    
+    calculateMA(prices, period) {
+        const slice = prices.slice(-period);
+        return slice.reduce((a, b) => a + b) / slice.length;
+    }
+}
+
+class BreakoutStrategy {
+    constructor() {
+        this.name = "Пробой уровней";
+    }
+    
+    analyze(symbol, historicalData) {
+        if (!historicalData || historicalData.length < 10) return null;
+        
+        const recentData = historicalData.slice(-10);
+        const highs = recentData.map(d => d.high);
+        const lows = recentData.map(d => d.low);
+        const resistance = Math.max(...highs.slice(0, -1));
+        const support = Math.min(...lows.slice(0, -1));
+        const currentClose = recentData[recentData.length - 1].close;
+        
+        if (currentClose > resistance * 1.01) {
+            return {
+                action: 'BUY',
+                price: currentClose,
+                targetPrice: currentClose * 1.08,
+                stopLoss: resistance * 0.99,
+                confidence: 75,
+                reason: 'Пробой сопротивления'
+            };
+        }
+        
+        return null;
+    }
+}
+// === КОНЕЦ СТРАТЕГИЙ ===
+
 // 🔐 Auth Manager
 class AuthManager {
     constructor() {
@@ -161,33 +253,45 @@ onAuthChange(user) {
     }
 }
 
-    updateUI() {
-        const userDisplay = document.getElementById('userDisplay');
-        const userInfo = document.getElementById('userInfo');
-        const authModal = document.getElementById('authModal');
+updateUI() {
+    const userDisplay = document.getElementById('userDisplay');
+    const userInfo = document.getElementById('userInfo');
+    const authModal = document.getElementById('authModal');
 
-        if (this.currentUser) {
-            userDisplay.textContent = this.currentUser.name || this.currentUser.email;
-            userInfo.classList.remove('glass');
-            userInfo.classList.add('user-avatar');
-            
-            if (this.currentUser.demo) {
-                userInfo.innerHTML = `
-                    <div class="w-8 h-8 demo-badge rounded-full flex items-center justify-center">
-                        <i class="fas fa-play text-white text-sm"></i>
-                    </div>
-                    <span class="text-sm">Демо</span>
-                `;
-            }
-            
-            authModal.classList.add('hidden');
-        } else {
-            userDisplay.textContent = 'Войти';
-            userInfo.classList.add('glass');
-            userInfo.classList.remove('user-avatar');
-            authModal.classList.remove('hidden');
-        }
+    // Проверяем существование элементов
+    if (!userDisplay || !userInfo || !authModal) {
+        console.warn('Auth UI elements not found');
+        return;
     }
+
+    if (this.currentUser) {
+        userDisplay.textContent = this.currentUser.name || this.currentUser.email;
+        userInfo.classList.remove('glass');
+        userInfo.classList.add('user-avatar');
+        
+        if (this.currentUser.demo) {
+            userInfo.innerHTML = `
+                <div class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center">
+                    <i class="fas fa-play text-white text-sm"></i>
+                </div>
+                <span class="text-sm">Демо</span>
+            `;
+        }
+        
+        authModal.classList.add('hidden');
+    } else {
+        userDisplay.textContent = 'Войти';
+        userInfo.classList.add('glass');
+        userInfo.classList.remove('user-avatar');
+        userInfo.innerHTML = `
+            <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                <i class="fas fa-user text-white"></i>
+            </div>
+            <span class="text-sm">Войти</span>
+        `;
+        authModal.classList.remove('hidden');
+    }
+}
 
     checkAuthStatus() {
         if (this.token) {
@@ -737,7 +841,49 @@ class CryptoSignal {
         this.init();
     }
 
-    async init() {
+        getCryptoName(symbol) {
+        const cryptoMap = {
+            'BTCUSDT': 'Bitcoin',
+            'ETHUSDT': 'Ethereum', 
+            'ADAUSDT': 'Cardano',
+            'DOTUSDT': 'Polkadot',
+            'MATICUSDT': 'Polygon',
+            'SOLUSDT': 'Solana',
+            'AVAXUSDT': 'Avalanche',
+            'ATOMUSDT': 'Cosmos',
+            'LINKUSDT': 'Chainlink',
+            'XRPUSDT': 'Ripple'
+        };
+        return cryptoMap[symbol] || symbol.replace('USDT', '');
+    }
+
+    getHistoricalData(symbol) {
+        // Возвращаем демо-данные для стратегий
+        const basePrices = {
+            'BTCUSDT': 45000, 'ETHUSDT': 3000, 'ADAUSDT': 0.5, 'DOTUSDT': 10,
+            'MATICUSDT': 1, 'SOLUSDT': 100, 'AVAXUSDT': 50, 'ATOMUSDT': 15
+        };
+        
+        const basePrice = basePrices[symbol] || 1;
+        const data = [];
+        
+        for (let i = 0; i < 20; i++) {
+            const price = basePrice * (1 + (Math.random() - 0.5) * 0.1);
+            data.push({
+                timestamp: Date.now() - (20 - i) * 3600000,
+                open: price * 0.99,
+                high: price * 1.02,
+                low: price * 0.98,
+                close: price,
+                volume: Math.random() * 1000000 + 100000
+            });
+        }
+        
+        return data;
+    }
+
+async init() {
+    try {
         this.setupEventListeners();
         this.setupQuickTrading();
         this.loadSettings();
@@ -745,7 +891,7 @@ class CryptoSignal {
         this.requestNotificationPermission();
         
         this.portfolioManager = new PortfolioManager(this);
-        this.loadSignalsHistory();
+        await this.loadSignalsHistory();
         
         await this.updateMarketData();
         this.generateSignals();
@@ -758,7 +904,10 @@ class CryptoSignal {
         }, this.settings.updateInterval);
 
         console.log('CryptoSignal инициализирован');
+    } catch (error) {
+        console.error('Ошибка инициализации CryptoSignal:', error);
     }
+}
 
     setupEventListeners() {
         document.getElementById('refreshBtn').addEventListener('click', () => {
@@ -835,103 +984,130 @@ class CryptoSignal {
         this.setupQuickTradeButtons();
     }
 
-    setupQuickTradeButtons() {
-        // Быстрые кнопки для скальпинга
-        const quickTradeHTML = `
-            <div class="quick-trade-panel glass rounded-xl p-4 mb-6">
-                <h4 class="text-lg font-bold mb-3 flex items-center">
-                    <i class="fas fa-bolt text-yellow-400 mr-2"></i>
-                    Быстрые сделки
-                </h4>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <button class="quick-buy-btn bg-green-600 hover:bg-green-700 py-2 px-3 rounded-lg text-sm transition-colors">
-                        🟢 Быстрая покупка
-                    </button>
-                    <button class="quick-sell-btn bg-red-600 hover:bg-red-700 py-2 px-3 rounded-lg text-sm transition-colors">
-                        🔴 Быстрая продажа
-                    </button>
-                    <button class="scalp-buy-btn bg-blue-600 hover:bg-blue-700 py-2 px-3 rounded-lg text-sm transition-colors">
-                        ⚡ Скальпинг лонг
-                    </button>
-                    <button class="scalp-sell-btn bg-purple-600 hover:bg-purple-700 py-2 px-3 rounded-lg text-sm transition-colors">
-                        ⚡ Скальпинг шорт
-                    </button>
-                </div>
-                <div class="mt-3 flex space-x-3">
-                    <select id="quickAmount" class="flex-1 px-2 py-1 bg-gray-700 rounded text-sm">
-                        <option value="5">$5</option>
-                        <option value="10" selected>$10</option>
-                        <option value="25">$25</option>
-                        <option value="50">$50</option>
-                    </select>
-                    <select id="quickSymbol" class="flex-1 px-2 py-1 bg-gray-700 rounded text-sm">
-                        <option value="BTCUSDT">BTC</option>
-                        <option value="ETHUSDT">ETH</option>
-                        <option value="SOLUSDT">SOL</option>
-                        <option value="AVAXUSDT">AVAX</option>
-                    </select>
-                </div>
-            </div>
-        `;
-        
-        const signalsSection = document.querySelector('#signalsContainer').parentElement;
-        signalsSection.insertAdjacentHTML('afterbegin', quickTradeHTML);
-        
-        this.setupQuickTradeHandlers();
+setupQuickTradeButtons() {
+    // Проверяем, не добавлена ли уже панель
+    if (document.querySelector('.quick-trade-panel')) {
+        return;
     }
 
-    setupQuickTradeHandlers() {
-        // Обработчики для быстрых сделок
-        document.querySelector('.quick-buy-btn').addEventListener('click', () => {
+    // Быстрые кнопки для скальпинга
+    const quickTradeHTML = `
+        <div class="quick-trade-panel glass rounded-xl p-4 mb-6">
+            <h4 class="text-lg font-bold mb-3 flex items-center">
+                <i class="fas fa-bolt text-yellow-400 mr-2"></i>
+                Быстрые сделки
+            </h4>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <button class="quick-buy-btn bg-green-600 hover:bg-green-700 py-2 px-3 rounded-lg text-sm transition-colors">
+                    🟢 Быстрая покупка
+                </button>
+                <button class="quick-sell-btn bg-red-600 hover:bg-red-700 py-2 px-3 rounded-lg text-sm transition-colors">
+                    🔴 Быстрая продажа
+                </button>
+                <button class="scalp-buy-btn bg-blue-600 hover:bg-blue-700 py-2 px-3 rounded-lg text-sm transition-colors">
+                    ⚡ Скальпинг лонг
+                </button>
+                <button class="scalp-sell-btn bg-purple-600 hover:bg-purple-700 py-2 px-3 rounded-lg text-sm transition-colors">
+                    ⚡ Скальпинг шорт
+                </button>
+            </div>
+            <div class="mt-3 flex space-x-3">
+                <select id="quickAmount" class="flex-1 px-2 py-1 bg-gray-700 rounded text-sm">
+                    <option value="5">$5</option>
+                    <option value="10" selected>$10</option>
+                    <option value="25">$25</option>
+                    <option value="50">$50</option>
+                </select>
+                <select id="quickSymbol" class="flex-1 px-2 py-1 bg-gray-700 rounded text-sm">
+                    <option value="BTCUSDT">BTC</option>
+                    <option value="ETHUSDT">ETH</option>
+                    <option value="SOLUSDT">SOL</option>
+                    <option value="AVAXUSDT">AVAX</option>
+                </select>
+            </div>
+        </div>
+    `;
+    
+    const signalsSection = document.querySelector('#signalsContainer').parentElement;
+    if (signalsSection) {
+        signalsSection.insertAdjacentHTML('afterbegin', quickTradeHTML);
+        this.setupQuickTradeHandlers();
+    }
+}
+
+setupQuickTradeHandlers() {
+    // Обработчики для быстрых сделок
+    const quickBuyBtn = document.querySelector('.quick-buy-btn');
+    const quickSellBtn = document.querySelector('.quick-sell-btn');
+    const scalpBuyBtn = document.querySelector('.scalp-buy-btn');
+    const scalpSellBtn = document.querySelector('.scalp-sell-btn');
+
+    if (quickBuyBtn) {
+        quickBuyBtn.addEventListener('click', () => {
             this.executeQuickTrade('BUY');
         });
-        
-        document.querySelector('.quick-sell-btn').addEventListener('click', () => {
+    }
+    
+    if (quickSellBtn) {
+        quickSellBtn.addEventListener('click', () => {
             this.executeQuickTrade('SELL');
         });
-        
-        document.querySelector('.scalp-buy-btn').addEventListener('click', () => {
+    }
+    
+    if (scalpBuyBtn) {
+        scalpBuyBtn.addEventListener('click', () => {
             this.executeScalpTrade('BUY');
         });
-        
-        document.querySelector('.scalp-sell-btn').addEventListener('click', () => {
+    }
+    
+    if (scalpSellBtn) {
+        scalpSellBtn.addEventListener('click', () => {
             this.executeScalpTrade('SELL');
         });
     }
+}
 
-    async executeQuickTrade(action) {
-        const symbol = document.getElementById('quickSymbol').value;
-        const amount = parseFloat(document.getElementById('quickAmount').value);
-        
-        const marketData = this.marketData.get(symbol);
-        if (!marketData) {
-            this.showNotification('Нет данных по выбранной паре', 'error');
-            return;
-        }
-        
-        const signal = {
-            id: 'quick_' + Date.now(),
-            symbol: symbol,
-            name: this.getCryptoName(symbol),
-            action: action,
-            price: marketData.price,
-            amount: amount / marketData.price,
-            timestamp: Date.now(),
-            type: 'QUICK_TRADE'
-        };
-        
-        this.showNotification(`${action} ${symbol} на $${amount}`, 'success');
-        await this.saveSignalToHistory(signal);
-        
-        // Имитация быстрой сделки
-        setTimeout(() => {
-            const profit = (Math.random() - 0.3) * amount * 0.1; // -30% to +70%
-            this.showNotification(
-                `Сделка закрыта: ${profit >= 0 ? '+' : ''}$${profit.toFixed(2)}`, 
-                profit >= 0 ? 'success' : 'warning'
-            );
-        }, 2000);
+async executeQuickTrade(action) {
+    const symbolElement = document.getElementById('quickSymbol');
+    const amountElement = document.getElementById('quickAmount');
+    
+    if (!symbolElement || !amountElement) {
+        this.showNotification('Ошибка: элементы быстрой торговли не найдены', 'error');
+        return;
     }
+    
+    const symbol = symbolElement.value || 'BTCUSDT';
+    const amount = parseFloat(amountElement.value) || 10;
+    
+    const marketData = this.marketData.get(symbol);
+    if (!marketData) {
+        this.showNotification('Нет данных по выбранной паре', 'error');
+        return;
+    }
+    
+    const signal = {
+        id: 'quick_' + Date.now(),
+        symbol: symbol,
+        name: this.getCryptoName(symbol),
+        action: action,
+        price: marketData.price,
+        amount: amount / marketData.price,
+        timestamp: Date.now(),
+        type: 'QUICK_TRADE'
+    };
+    
+    this.showNotification(`${action} ${symbol} на $${amount}`, 'success');
+    await this.saveSignalToHistory(signal);
+    
+    // Имитация быстрой сделки
+    setTimeout(() => {
+        const profit = (Math.random() - 0.3) * amount * 0.1; // -30% to +70%
+        this.showNotification(
+            `Сделка закрыта: ${profit >= 0 ? '+' : ''}$${profit.toFixed(2)}`, 
+            profit >= 0 ? 'success' : 'warning'
+        );
+    }, 2000);
+}
 
     async executeScalpTrade(action) {
         const symbol = document.getElementById('quickSymbol').value;
@@ -1095,7 +1271,7 @@ generateMarketSignals() {
     const signals = [];
     const filteredPairs = this.filterPairsByType();
     
-    // Добавляем стратегии
+    // Создаем экземпляры стратегий
     const strategies = [
         new ScalpingStrategy(),
         new TrendFollowingStrategy(), 
@@ -1112,18 +1288,22 @@ generateMarketSignals() {
         
         // Дополнительные стратегии
         strategies.forEach(strategy => {
-            const strategySignal = strategy.analyze(pair.symbol, this.getHistoricalData(pair.symbol));
-            if (strategySignal) {
-                signals.push({
-                    ...strategySignal,
-                    id: Date.now() + Math.random(),
-                    pair: pair.symbol,
-                    name: pair.name,
-                    price: marketData.price,
-                    timestamp: Date.now(),
-                    expiry: Date.now() + (30 * 60 * 1000),
-                    strategy: strategy.name
-                });
+            try {
+                const strategySignal = strategy.analyze(pair.symbol, this.getHistoricalData(pair.symbol));
+                if (strategySignal) {
+                    signals.push({
+                        ...strategySignal,
+                        id: Date.now() + Math.random(),
+                        pair: pair.symbol,
+                        name: pair.name,
+                        price: marketData.price,
+                        timestamp: Date.now(),
+                        expiry: Date.now() + (30 * 60 * 1000),
+                        strategy: strategy.name
+                    });
+                }
+            } catch (error) {
+                console.warn(`Ошибка в стратегии ${strategy.name}:`, error);
             }
         });
     });
@@ -1501,8 +1681,20 @@ initChart(symbol = 'BTCUSDT') {
         this.chart = null;
     }
     
-    const ctx = document.getElementById('marketChart').getContext('2d');
-    this.chart = new Chart(ctx, {
+    const ctx = document.getElementById('marketChart');
+    if (!ctx) {
+        console.error('Canvas element not found');
+        return;
+    }
+    
+    // Полностью очищаем контекст
+    const parent = ctx.parentElement;
+    const newCanvas = document.createElement('canvas');
+    newCanvas.id = 'marketChart';
+    newCanvas.height = 384; // Высота как в HTML
+    parent.replaceChild(newCanvas, ctx);
+    
+    this.chart = new Chart(newCanvas, {
         type: 'line',
         data: {
             labels: [],
@@ -1512,32 +1704,53 @@ initChart(symbol = 'BTCUSDT') {
                 borderColor: '#f59e0b',
                 backgroundColor: 'rgba(245, 158, 11, 0.1)',
                 tension: 0.4,
-                fill: true
+                fill: true,
+                borderWidth: 2
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { labels: { color: '#ffffff' } }
+                legend: { 
+                    labels: { 
+                        color: '#ffffff',
+                        font: { size: 12 }
+                    } 
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#ffffff'
+                }
             },
             scales: {
                 x: { 
                     ticks: { color: '#ffffff' }, 
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' } 
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
                 },
                 y: { 
                     ticks: { color: '#ffffff' }, 
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' } 
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
                 }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
             }
         }
     });
     
     // Добавляем обработчик изменения символа
-    document.getElementById('chartSymbol').addEventListener('change', (e) => {
-        this.updateChartWithSymbol(e.target.value);
-    });
+    const chartSymbolSelect = document.getElementById('chartSymbol');
+    if (chartSymbolSelect) {
+        chartSymbolSelect.addEventListener('change', (e) => {
+            this.updateChartWithSymbol(e.target.value);
+        });
+    }
 }
 
 async updateChartWithSymbol(symbol) {
