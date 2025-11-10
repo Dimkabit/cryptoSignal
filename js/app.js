@@ -319,74 +319,7 @@ class PortfolioManager {
         });
     }
 
-    showAddAssetModal() {
-        document.getElementById('assetBuyDate').value = new Date().toISOString().split('T')[0];
-        document.getElementById('addAssetModal').classList.remove('hidden');
-    }
-
-    hideAddAssetModal() {
-        document.getElementById('addAssetModal').classList.add('hidden');
-        document.getElementById('addAssetForm').reset();
-    }
-
-    autoCalculateTargets() {
-        const buyPrice = parseFloat(document.getElementById('assetBuyPrice').value);
-        if (buyPrice && buyPrice > 0) {
-            const targetPrice = buyPrice * 1.05;
-            const stopLoss = buyPrice * 0.98;
-            
-            document.getElementById('assetTargetPrice').value = targetPrice.toFixed(4);
-            document.getElementById('assetStopLoss').value = stopLoss.toFixed(4);
-        }
-    }
-
-    async saveAsset() {
-        const formData = {
-            symbol: document.getElementById('assetSymbol').value,
-            amount: parseFloat(document.getElementById('assetAmount').value),
-            buy_price: parseFloat(document.getElementById('assetBuyPrice').value),
-            target_price: parseFloat(document.getElementById('assetTargetPrice').value) || null,
-            stop_loss: parseFloat(document.getElementById('assetStopLoss').value) || null,
-            buy_date: document.getElementById('assetBuyDate').value,
-            notes: document.getElementById('assetNotes').value
-        };
-
-        if (!formData.symbol || !formData.amount || !formData.buy_price) {
-            alert('Пожалуйста, заполните обязательные поля: криптовалюта, количество и цена покупки');
-            return;
-        }
-
-        try {
-            const currentData = await this.api.fetchCryptoData(formData.symbol);
-            if (!currentData) {
-                alert('Не удалось получить текущую цену для этой криптовалюты');
-                return;
-            }
-
-            const assetData = {
-                ...formData,
-                id: Date.now().toString(),
-                user_id: this.userId,
-                name: this.getCryptoName(formData.symbol),
-                current_price: currentData.price,
-                total_value: currentData.price * formData.amount,
-                profit_loss: (currentData.price - formData.buy_price) * formData.amount,
-                profit_loss_percent: ((currentData.price - formData.buy_price) / formData.buy_price) * 100,
-                created_at: new Date().toISOString()
-            };
-
-            await this.addPortfolioAsset(assetData);
-            await this.loadPortfolio();
-            this.showNotification(`Актив ${assetData.name} добавлен в портфель`, 'success');
-            this.hideAddAssetModal();
-
-        } catch (error) {
-            console.error('Ошибка при сохранении актива:', error);
-            alert('Ошибка при сохранении актива. Попробуйте еще раз.');
-        }
-    }
-
-        setupQuickTrading() {
+            setupQuickTrading() {
         this.quickTrades = {
             enabled: false,
             amount: 10, // USDT
@@ -512,6 +445,75 @@ class PortfolioManager {
             }, (i + 1) * 1000);
         }
     }
+
+    showAddAssetModal() {
+        document.getElementById('assetBuyDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('addAssetModal').classList.remove('hidden');
+    }
+
+    hideAddAssetModal() {
+        document.getElementById('addAssetModal').classList.add('hidden');
+        document.getElementById('addAssetForm').reset();
+    }
+
+    autoCalculateTargets() {
+        const buyPrice = parseFloat(document.getElementById('assetBuyPrice').value);
+        if (buyPrice && buyPrice > 0) {
+            const targetPrice = buyPrice * 1.05;
+            const stopLoss = buyPrice * 0.98;
+            
+            document.getElementById('assetTargetPrice').value = targetPrice.toFixed(4);
+            document.getElementById('assetStopLoss').value = stopLoss.toFixed(4);
+        }
+    }
+
+    async saveAsset() {
+        const formData = {
+            symbol: document.getElementById('assetSymbol').value,
+            amount: parseFloat(document.getElementById('assetAmount').value),
+            buy_price: parseFloat(document.getElementById('assetBuyPrice').value),
+            target_price: parseFloat(document.getElementById('assetTargetPrice').value) || null,
+            stop_loss: parseFloat(document.getElementById('assetStopLoss').value) || null,
+            buy_date: document.getElementById('assetBuyDate').value,
+            notes: document.getElementById('assetNotes').value
+        };
+
+        if (!formData.symbol || !formData.amount || !formData.buy_price) {
+            alert('Пожалуйста, заполните обязательные поля: криптовалюта, количество и цена покупки');
+            return;
+        }
+
+        try {
+            const currentData = await this.api.fetchCryptoData(formData.symbol);
+            if (!currentData) {
+                alert('Не удалось получить текущую цену для этой криптовалюты');
+                return;
+            }
+
+            const assetData = {
+                ...formData,
+                id: Date.now().toString(),
+                user_id: this.userId,
+                name: this.getCryptoName(formData.symbol),
+                current_price: currentData.price,
+                total_value: currentData.price * formData.amount,
+                profit_loss: (currentData.price - formData.buy_price) * formData.amount,
+                profit_loss_percent: ((currentData.price - formData.buy_price) / formData.buy_price) * 100,
+                created_at: new Date().toISOString()
+            };
+
+            await this.addPortfolioAsset(assetData);
+            await this.loadPortfolio();
+            this.showNotification(`Актив ${assetData.name} добавлен в портфель`, 'success');
+            this.hideAddAssetModal();
+
+        } catch (error) {
+            console.error('Ошибка при сохранении актива:', error);
+            alert('Ошибка при сохранении актива. Попробуйте еще раз.');
+        }
+    }
+
+
 
     getCryptoName(symbol) {
         const cryptoMap = {
